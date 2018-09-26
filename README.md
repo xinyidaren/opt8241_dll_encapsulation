@@ -1,0 +1,2 @@
+# opt8241_dll_encapsulation
+opt8241库封装成so文件
