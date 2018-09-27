@@ -6,8 +6,6 @@
 
 
 #include "CameraSystem.h"
-
-#include "SimpleOpt.h"
 #include "Common.h"
 #include "UVCStreamer.h"
 #include <iomanip>
@@ -25,110 +23,23 @@ enum Options
   CAPTURE_TYPE = 5
 };
 
-Vector<CSimpleOpt::SOption> argumentSpecifications = 
-{
-  { VENDOR_ID,    "-v", SO_REQ_SEP, "Vendor ID of the USB device (hexadecimal)"}, // Only worker count is needed here
-  { PRODUCT_ID,   "-p", SO_REQ_SEP, "Comma separated list of Product IDs of the USB devices (hexadecimal)"},
-  { SERIAL_NUMBER,"-s", SO_REQ_SEP, "Serial number of the USB device (string)"},
-  { DUMP_FILE,    "-f", SO_REQ_SEP, "Name of the file to dump extracted frames"},
-  { NUM_OF_FRAMES,"-n", SO_REQ_SEP, "Number of frames to dump [default = 1]"},
-  { CAPTURE_TYPE, "-t", SO_REQ_SEP, "Type of capture (raw/raw_processed/depth/pointcloud) [default = raw]" },
-  SO_END_OF_OPTIONS
-};
-
-void help()
-{
-  std::cout << "DepthCapture v1.0" << std::endl;
-  
-  CSimpleOpt::SOption *option = argumentSpecifications.data();
-  
-  while(option->nId >= 0)
-  {
-    std::cout << option->pszArg << " " << option->helpInfo << std::endl;
-    option++;
-  }
-}
-
 
 int main(int argc, char *argv[])
-{
-  CSimpleOpt s(argc, argv, argumentSpecifications);
-  
+{  
   logger.setDefaultLogLevel(LOG_INFO);
-  
-  uint16_t vid = 0;
-  
+    
   Vector<uint16_t> pids;
   String serialNumber;
-  String dumpFileName;
 
   String type = "raw";
   
   int32_t frameCount = 1;
-  
-  char *endptr;
-  
-  while (s.Next())
-  {
-    if (s.LastError() != SO_SUCCESS)
-    {
-      std::cout << s.GetLastErrorText(s.LastError()) << ": '" << s.OptionText() << "' (use -h to get command line help)" << std::endl;
-      help();
-      return -1;
-    }
-    
-    //std::cout << s.OptionId() << ": " << s.OptionArg() << std::endl;
-    
-    Vector<String> splits;
-    switch (s.OptionId())
-    {
-      case VENDOR_ID:
-        vid = (uint16_t)strtol(s.OptionArg(), &endptr, 16);
-        break;
-        
-      case PRODUCT_ID:
-        split(s.OptionArg(), ',', splits);
-        
-        for(auto &s1: splits)
-          pids.push_back((uint16_t)strtol(s1.c_str(), &endptr, 16));
-        
-        break;
-        
-      case SERIAL_NUMBER:
-        serialNumber = s.OptionArg();
-        break;
-        
-      case DUMP_FILE:
-        dumpFileName = s.OptionArg();
-        break;
-        
-      case NUM_OF_FRAMES:
-        frameCount = (int32_t)strtol(s.OptionArg(), &endptr, 10);
-        break;
 
-      case CAPTURE_TYPE:
-        type = s.OptionArg();
-        break;
-        
-      default:
-        help();
-        break;
-    };
-  }
-  
-  if(vid == 0 || pids.size() == 0 || pids[0] == 0 || dumpFileName.size() == 0)
-  {
-    std::cerr << "Required argument missing." << std::endl;
-    help();
-    return -1;
-  }
 
-  if (type != "raw" && type != "raw_processed" && type != "depth" && type != "pointcloud")
-  {
-    std::cerr << "Unknown type '" << type << "'" << std::endl;
-    help();
-    return -1;
-  }
+  uint16_t vid = (uint16_t)0x0451;
+  pids.push_back((uint16_t)0x9105);
+  String dumpFileName = "img";
+  type = "depth";
   
   std::ofstream f(dumpFileName, std::ios::binary | std::ios::out);
   
@@ -324,7 +235,7 @@ int main(int argc, char *argv[])
         dc.stop();
     });
   }
-  
+
   if(depthCamera->start())
   {
     FrameRate r;
