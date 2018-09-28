@@ -7,7 +7,7 @@ ENDIF()
 
 FIND_PACKAGE(Voxel 0.1.0 REQUIRED)
 
-ADD_EXECUTABLE(DepthCapture DepthCapture.cpp)
+ADD_LIBRARY(DepthCapture SHARED DepthCapture.cpp)
 
 TARGET_INCLUDE_DIRECTORIES(DepthCapture PUBLIC ${VOXEL_INCLUDE_DIRS})
 
