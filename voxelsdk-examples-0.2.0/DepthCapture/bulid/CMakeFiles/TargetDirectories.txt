@@ -1,0 +1,3 @@
+/home/learn/opt8241/opt8241_dll_encapsulation/voxelsdk-examples-0.2.0/DepthCapture/bulid/CMakeFiles/rebuild_cache.dir
+/home/learn/opt8241/opt8241_dll_encapsulation/voxelsdk-examples-0.2.0/DepthCapture/bulid/CMakeFiles/edit_cache.dir
+/home/learn/opt8241/opt8241_dll_encapsulation/voxelsdk-examples-0.2.0/DepthCapture/bulid/CMakeFiles/DepthCapture.dir
