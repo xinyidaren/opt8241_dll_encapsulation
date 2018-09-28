@@ -13,238 +13,248 @@
 
 using namespace Voxel;
 
-enum Options
+class Camera
 {
-  VENDOR_ID = 0,
-  PRODUCT_ID = 1,
-  SERIAL_NUMBER = 2,
-  DUMP_FILE = 3,
-  NUM_OF_FRAMES = 4,
-  CAPTURE_TYPE = 5
+public:
+    int init();
+    int get_img();
+
+private:
+    uint16_t m_pid;
+    String m_type;
+    int32_t m_frameCount;
+    uint16_t m_vid;
+    String m_dumpFileName;
+    DepthCameraPtr m_depthCamera;
+    CameraSystem m_sys;
+    DevicePtr m_toConnect;
 };
 
 
-int main(int argc, char *argv[])
-{  
-  logger.setDefaultLogLevel(LOG_INFO);
-    
-  Vector<uint16_t> pids;
-  String serialNumber;
+int Camera::init()
+{
+    logger.setDefaultLogLevel(LOG_INFO);
+    m_type = "depth";
+    m_frameCount = 10;
+    m_vid = (uint16_t)0x0451;
+    m_pid = (uint16_t)0x9105;
+    m_dumpFileName = "img";
+    String serialNumber;
 
-  String type = "raw";
-  
-  int32_t frameCount = 1;
+
+    // Get all valid detected devices
+    const Vector<DevicePtr> &devices = m_sys.scan();
 
 
-  uint16_t vid = (uint16_t)0x0451;
-  pids.push_back((uint16_t)0x9105);
-  String dumpFileName = "img";
-  type = "depth";
-  
-  std::ofstream f(dumpFileName, std::ios::binary | std::ios::out);
-  
-  if(!f.good())
-  {
-    std::cerr << "Failed to open '" << dumpFileName << "'" << std::endl;
-    return -1;
-  }
-  
-  CameraSystem sys;
-  
-  // Get all valid detected devices
-  const Vector<DevicePtr> &devices = sys.scan();
-  
-  DevicePtr toConnect;
-  
-  std::cout << "Detected devices: " << std::endl;
-  for(auto &d: devices)
-  {
-    std::cout << d->id() << std::endl;
-    
-    if(d->interfaceID() == Device::USB)
+    std::cout << "Detected devices: " << std::endl;
+    for(auto &d: devices)
     {
-      USBDevice &usb = (USBDevice &)*d;
-      
-      if(usb.vendorID() == vid && (serialNumber.size() == 0 || usb.serialNumber() == serialNumber))
+      std::cout << d->id() << std::endl;
+
+      if(d->interfaceID() == Device::USB)
       {
-        for(auto pid: pids)
-          if(usb.productID() == pid)
-            toConnect = d;
+        USBDevice &usb = (USBDevice &)*d;
+
+        if(usb.vendorID() == m_vid && (serialNumber.size() == 0 || usb.serialNumber() == serialNumber))
+        {
+            if(usb.productID() == m_pid)
+              m_toConnect = d;
+        }
       }
     }
-  }
-  
-  if(!toConnect)
-  {
-    std::cerr << "No valid device found for the specified VID:PID:serialnumber" << std::endl;
-    return -1;
-  }
-    
-  DepthCameraPtr depthCamera = sys.connect(toConnect);
-  
-  if(!depthCamera)
-  {
-    std::cerr << "Could not load depth camera for device " << toConnect->id() << std::endl;
-    return -1;
-  }
+    if(!m_toConnect)
+    {
+      std::cerr << "No valid device found for the specified VID:PID:serialnumber" << std::endl;
+      return -1;
+    }
 
-  if(!depthCamera->isInitialized())
-  {
-    std::cerr << "Depth camera not initialized for device " << toConnect->id() << std::endl;
-    return -1;
-  }
-  
-  std::cout << "Successfully loaded depth camera for device " << toConnect->id() << std::endl;
-  
-  int count = 0;
-  
-  TimeStampType lastTimeStamp = 0;
+    m_depthCamera = m_sys.connect(m_toConnect);
 
-  if (type == "raw")
-  {
-    depthCamera->registerCallback(DepthCamera::FRAME_RAW_FRAME_UNPROCESSED, [&](DepthCamera &dc, const Frame &frame, DepthCamera::FrameType c) {
-      const RawDataFrame *d = dynamic_cast<const RawDataFrame *>(&frame);
+    if(!m_depthCamera)
+    {
+      std::cerr << "Could not load depth camera for device " << m_toConnect->id() << std::endl;
+      return -1;
+    }
 
-      if (!d)
-      {
-        std::cout << "Null frame captured? or not of type RawDataFrame" << std::endl;
-        return;
-      }
+    if(!m_depthCamera->isInitialized())
+    {
+      std::cerr << "Depth camera not initialized for device " << m_toConnect->id() << std::endl;
+      return -1;
+    }
 
-      std::cout << "Capture frame " << d->id << "@" << d->timestamp;
+    std::cout << "Successfully loaded depth camera for device " << m_toConnect->id() << std::endl;
+    return 0;
 
-      if (lastTimeStamp != 0)
-        std::cout << " (" << 1E6 / (d->timestamp - lastTimeStamp) << " fps)";
+}
 
-      std::cout << std::endl;
+int Camera::get_img()
+{
 
-      f.write((char *)&d->id, sizeof(d->id));
-      f.write((char *)&d->timestamp, sizeof(d->timestamp));
+    int count = 0;
 
-      lastTimeStamp = d->timestamp;
+    TimeStampType lastTimeStamp = 0;
 
-      f.write((char *)d->data.data(), d->data.size());
+    std::ofstream f(m_dumpFileName, std::ios::binary | std::ios::out);
 
-      count++;
 
-      if (count >= frameCount)
-        dc.stop();
-    });
-  } 
-  else if (type == "raw_processed")
-  {
-    depthCamera->registerCallback(DepthCamera::FRAME_RAW_FRAME_PROCESSED, [&](DepthCamera &dc, const Frame &frame, DepthCamera::FrameType c) {
-      const ToFRawFrame *d = dynamic_cast<const ToFRawFrame *>(&frame);
+    if(!f.good())
+    {
+      std::cerr << "Failed to open '" << m_dumpFileName << "'" << std::endl;
+      return -1;
+    }
 
-      if (!d)
-      {
-        std::cout << "Null frame captured? or not of type ToFRawFrame" << std::endl;
-        return;
-      }
+    if (m_type == "raw")
+    {
+      m_depthCamera->registerCallback(DepthCamera::FRAME_RAW_FRAME_UNPROCESSED, [&](DepthCamera &dc, const Frame &frame, DepthCamera::FrameType c) {
+        const RawDataFrame *d = dynamic_cast<const RawDataFrame *>(&frame);
 
-      std::cout << "Capture frame " << d->id << "@" << d->timestamp;
+        if (!d)
+        {
+          std::cout << "Null frame captured? or not of type RawDataFrame" << std::endl;
+          return;
+        }
 
-      if (lastTimeStamp != 0)
-        std::cout << " (" << 1E6 / (d->timestamp - lastTimeStamp) << " fps)";
+        std::cout << "Capture frame " << d->id << "@" << d->timestamp;
 
-      std::cout << std::endl;
+        if (lastTimeStamp != 0)
+          std::cout << " (" << 1E6 / (d->timestamp - lastTimeStamp) << " fps)";
 
-      f.write((char *)&d->id, sizeof(d->id));
-      f.write((char *)&d->timestamp, sizeof(d->timestamp));
+        std::cout << std::endl;
 
-      lastTimeStamp = d->timestamp;
+        f.write((char *)&d->id, sizeof(d->id));
+        f.write((char *)&d->timestamp, sizeof(d->timestamp));
 
-      if (d->phase())
-        f.write((char *)d->phase(), d->phaseWordWidth()*d->size.width*d->size.height);
+        lastTimeStamp = d->timestamp;
 
-      if (d->amplitude())
-        f.write((char *)d->amplitude(), d->amplitudeWordWidth()*d->size.width*d->size.height);
+        f.write((char *)d->data.data(), d->data.size());
 
-      if (d->ambient())
-        f.write((char *)d->ambient(), d->ambientWordWidth()*d->size.width*d->size.height);
+        count++;
 
-      if (d->flags())
-        f.write((char *)d->flags(), d->flagsWordWidth()*d->size.width*d->size.height);
+        if (count >= m_frameCount)
+          dc.stop();
+      });
+    }
+    else if (m_type == "raw_processed")
+    {
+      m_depthCamera->registerCallback(DepthCamera::FRAME_RAW_FRAME_PROCESSED, [&](DepthCamera &dc, const Frame &frame, DepthCamera::FrameType c) {
+        const ToFRawFrame *d = dynamic_cast<const ToFRawFrame *>(&frame);
 
-      count++;
+        if (!d)
+        {
+          std::cout << "Null frame captured? or not of type ToFRawFrame" << std::endl;
+          return;
+        }
 
-      if (count >= frameCount)
-        dc.stop();
-    });
-  }
-  else if (type == "depth")
-  {
-    depthCamera->registerCallback(DepthCamera::FRAME_DEPTH_FRAME, [&](DepthCamera &dc, const Frame &frame, DepthCamera::FrameType c) {
-      const DepthFrame *d = dynamic_cast<const DepthFrame *>(&frame);
+        std::cout << "Capture frame " << d->id << "@" << d->timestamp;
 
-      if (!d)
-      {
-        std::cout << "Null frame captured? or not of type DepthFrame" << std::endl;
-        return;
-      }
+        if (lastTimeStamp != 0)
+          std::cout << " (" << 1E6 / (d->timestamp - lastTimeStamp) << " fps)";
 
-      std::cout << "Capture frame " << d->id << "@" << d->timestamp;
+        std::cout << std::endl;
 
-      if (lastTimeStamp != 0)
-        std::cout << " (" << 1E6 / (d->timestamp - lastTimeStamp) << " fps)";
+        f.write((char *)&d->id, sizeof(d->id));
+        f.write((char *)&d->timestamp, sizeof(d->timestamp));
 
-      std::cout << std::endl;
+        lastTimeStamp = d->timestamp;
 
-      f.write((char *)&d->id, sizeof(d->id));
-      f.write((char *)&d->timestamp, sizeof(d->timestamp));
+        if (d->phase())
+          f.write((char *)d->phase(), d->phaseWordWidth()*d->size.width*d->size.height);
 
-      lastTimeStamp = d->timestamp;
+        if (d->amplitude())
+          f.write((char *)d->amplitude(), d->amplitudeWordWidth()*d->size.width*d->size.height);
 
-      f.write((char *)d->depth.data(), sizeof(float)*d->size.width*d->size.height);
-      f.write((char *)d->amplitude.data(), sizeof(float)*d->size.width*d->size.height);
+        if (d->ambient())
+          f.write((char *)d->ambient(), d->ambientWordWidth()*d->size.width*d->size.height);
 
-      count++;
+        if (d->flags())
+          f.write((char *)d->flags(), d->flagsWordWidth()*d->size.width*d->size.height);
 
-      if (count >= frameCount)
-        dc.stop();
-    });
-  }
-  else if (type == "pointcloud")
-  {
-    depthCamera->registerCallback(DepthCamera::FRAME_XYZI_POINT_CLOUD_FRAME, [&](DepthCamera &dc, const Frame &frame, DepthCamera::FrameType c) {
-      const XYZIPointCloudFrame *d = dynamic_cast<const XYZIPointCloudFrame *>(&frame);
+        count++;
 
-      if (!d)
-      {
-        std::cout << "Null frame captured? or not of type XYZIPointCloudFrame" << std::endl;
-        return;
-      }
+        if (count >= m_frameCount)
+          dc.stop();
+      });
+    }
+    else if (m_type == "depth")
+    {
+        m_depthCamera->registerCallback(DepthCamera::FRAME_DEPTH_FRAME, [&](DepthCamera &dc, const Frame &frame, DepthCamera::FrameType c) {
+        const DepthFrame *d = dynamic_cast<const DepthFrame *>(&frame);
+        if (!d)
+        {
+          std::cout << "Null frame captured? or not of type DepthFrame" << std::endl;
+          return;
+        }
 
-      std::cout << "Capture frame " << d->id << "@" << d->timestamp;
+        std::cout << "Capture frame " << d->id << "@" << d->timestamp;
 
-      if (lastTimeStamp != 0)
-        std::cout << " (" << 1E6 / (d->timestamp - lastTimeStamp) << " fps)";
+        if (lastTimeStamp != 0)
+          std::cout << " (" << 1E6 / (d->timestamp - lastTimeStamp) << " fps)";
 
-      std::cout << std::endl;
+        std::cout << std::endl;
 
-      f.write((char *)&d->id, sizeof(d->id));
-      f.write((char *)&d->timestamp, sizeof(d->timestamp));
+        f.write((char *)&d->id, sizeof(d->id));
+        f.write((char *)&d->timestamp, sizeof(d->timestamp));
 
-      lastTimeStamp = d->timestamp;
+        lastTimeStamp = d->timestamp;
 
-      f.write((char *)d->points.data(), sizeof(IntensityPoint)*d->points.size());
+        f.write((char *)d->depth.data(), sizeof(float)*d->size.width*d->size.height);
+        f.write((char *)d->amplitude.data(), sizeof(float)*d->size.width*d->size.height);
 
-      count++;
+        count++;
 
-      if (count >= frameCount)
-        dc.stop();
-    });
-  }
+        if (count >= m_frameCount)
+          dc.stop();
+      });
+    }
+    else if (m_type == "pointcloud")
+    {
+      m_depthCamera->registerCallback(DepthCamera::FRAME_XYZI_POINT_CLOUD_FRAME, [&](DepthCamera &dc, const Frame &frame, DepthCamera::FrameType c) {
+        const XYZIPointCloudFrame *d = dynamic_cast<const XYZIPointCloudFrame *>(&frame);
 
-  if(depthCamera->start())
-  {
-    FrameRate r;
-    if(depthCamera->getFrameRate(r))
-      logger(LOG_INFO) << "Capturing at a frame rate of " << r.getFrameRate() << " fps" << std::endl;
-    depthCamera->wait();
-  }
-  else
-    std::cerr << "Could not start the depth camera " << depthCamera->id() << std::endl;
+        if (!d)
+        {
+          std::cout << "Null frame captured? or not of type XYZIPointCloudFrame" << std::endl;
+          return;
+        }
 
+        std::cout << "Capture frame " << d->id << "@" << d->timestamp;
+
+        if (lastTimeStamp != 0)
+          std::cout << " (" << 1E6 / (d->timestamp - lastTimeStamp) << " fps)";
+
+        std::cout << std::endl;
+
+        f.write((char *)&d->id, sizeof(d->id));
+        f.write((char *)&d->timestamp, sizeof(d->timestamp));
+
+        lastTimeStamp = d->timestamp;
+
+        f.write((char *)d->points.data(), sizeof(IntensityPoint)*d->points.size());
+
+        count++;
+
+        if (count >= m_frameCount)
+          dc.stop();
+      });
+    }
+
+    if(m_depthCamera->start())
+    {
+      FrameRate r;
+      if(m_depthCamera->getFrameRate(r))
+        logger(LOG_INFO) << "Capturing at a frame rate of " << r.getFrameRate() << " fps" << std::endl;
+      m_depthCamera->wait();
+    }
+    else
+      std::cerr << "Could not start the depth camera " << m_depthCamera->id() << std::endl;
+    return 0;
+
+}
+
+int main(int argc, char *argv[])
+{  
+  Camera camera;
+  camera.init();
+  camera.get_img();
   return 0;
 }
