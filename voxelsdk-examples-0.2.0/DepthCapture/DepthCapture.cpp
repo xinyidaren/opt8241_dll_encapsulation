@@ -8,6 +8,7 @@
 #include "UVCStreamer.h"
 #include <iomanip>
 #include <fstream>
+#include<cstring>
 
 using namespace Voxel;
 
@@ -15,7 +16,7 @@ class Camera
 {
 public:
     int init();
-    int get_img();
+    int get_img(float array[],int num);
 
 private:
     uint16_t m_pid;
@@ -32,7 +33,7 @@ int Camera::init()
 {
     logger.setDefaultLogLevel(LOG_INFO);
     m_type = "depth";
-    m_frameCount = 10;
+    m_frameCount = 1;
     m_vid = (uint16_t)0x0451;
     m_pid = (uint16_t)0x9105;
     m_dumpFileName = "img";
@@ -82,21 +83,12 @@ int Camera::init()
 
 }
 
-int Camera::get_img()
+int Camera::get_img(float array[],int num)
 {
 
     int count = 0;
 
     TimeStampType lastTimeStamp = 0;
-
-    std::ofstream f(m_dumpFileName, std::ios::binary | std::ios::out);
-
-
-    if(!f.good())
-    {
-      std::cerr << "Failed to open '" << m_dumpFileName << "'" << std::endl;
-      return -1;
-    }
 
     if (m_type == "depth")
     {
@@ -107,9 +99,9 @@ int Camera::get_img()
           std::cout << "Null frame captured? or not of type DepthFrame" << std::endl;
           return;
         }
-        f.write((char *)d->depth.data(), sizeof(float)*d->size.width*d->size.height);
+        memcpy(array,d->depth.data(),sizeof(float)*d->size.width*d->size.height);
+
         count++;
-        std::cout << count << std::endl;
         if (count >= m_frameCount)
           dc.stop();
       });
@@ -117,9 +109,6 @@ int Camera::get_img()
 
     if(m_depthCamera->start())
     {
-      FrameRate r;
-      if(m_depthCamera->getFrameRate(r))
-        logger(LOG_INFO) << "Capturing at a frame rate of " << r.getFrameRate() << " fps" << std::endl;
       m_depthCamera->wait();
     }
     else
@@ -130,10 +119,12 @@ int Camera::get_img()
 
 extern "C" {
     Camera camera;
-    void init() {
+    void init()
+    {
         camera.init();
-      }
-    void get_img() {
-        camera.get_img();
-      }
+    }
+    void get_img(float array[],int num)
+    {
+        camera.get_img(array,num);
+    }
 }

@@ -17,6 +17,8 @@ iomanip
 -
 fstream
 -
+cstring
+-
 
 /usr/local/lib/cmake/Voxel/../../../include/voxel-0.6.9/CameraSystem.h
 DepthCameraLibrary.h
