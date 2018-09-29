@@ -13,10 +13,14 @@ print (lib.sum())
 print ('------------------add(3,4)------------------')
 print (lib.add(3,4))
 print ('------------------sum_array(carray, len(pyarray))------------------')
-
 pyarray = [1,2,3,4,5,6,7,8]
 carray = (ctypes.c_int*len(pyarray))(*pyarray)
 print(lib.sum_array(carray, len(pyarray)))
 print ('------------------modify_array(carray, len(pyarray))------------------')
 lib.modify_array(carray, len(pyarray))
+print (np.array(carray))
+print ('------------------float_modify_array(carray, len(pyarray))------------------')
+pyarray = [1.1,2.2,3.3,4.4,5.5,6.6,7.7,8.8]
+carray = (ctypes.c_float*len(pyarray))(*pyarray)
+lib.float_modify_array(carray, len(pyarray))
 print (np.array(carray))

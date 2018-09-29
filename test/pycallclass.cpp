@@ -11,6 +11,8 @@ class TestLib
         int add(int a,int b);
         int sum_array(int array[], int num);
         void modify_array(int array[], int num);
+        void modify_array(float array[], int num);
+
     private:
 };
 void TestLib::display()
@@ -53,9 +55,16 @@ int TestLib::sum_array(int array[], int num)
 
 void TestLib::modify_array(int array[], int num)
 {
-    int i =0, sum = 0;
+    int i =0;
     for(i=0; i<num; ++i)
         array[i] *= 10;
+}
+
+void TestLib::modify_array(float array[], int num)
+{
+    int i =0;
+    for(i=0; i<num; ++i)
+        array[i] *= 11;
 }
 extern "C"
 {
@@ -86,6 +95,10 @@ extern "C"
        return obj.sum_array(array,num);
     }
     void modify_array(int array[], int num)
+    {
+        obj.modify_array(array,num);
+    }
+    void float_modify_array(float array[], int num)
     {
         obj.modify_array(array,num);
     }
